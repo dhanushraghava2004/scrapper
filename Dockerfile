@@ -1,25 +1,16 @@
-# Base Python
-FROM python:3.11-slim
+# Browsers + system deps preinstalled (matches your playwright==1.48.0)
+FROM mcr.microsoft.com/playwright/python:v1.48.0-jammy
 
-# System deps needed for Playwright Chromium
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl unzip fonts-liberation libnss3 libnss3-dev libatk1.0-0 libatk-bridge2.0-0 \
-    libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
-    libgbm1 libasound2 libpangocairo-1.0-0 libxshmfence1 \
-    && rm -rf /var/lib/apt/lists/*
-
+# (Optional) keep image smaller by cleaning pip cache (the base image is slimmed already)
 WORKDIR /app
 
-# Install Python deps first (cache)
+# Install your Python deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browser
-RUN python -m playwright install --with-deps chromium
-
-# Copy app
+# Copy your code
 COPY . .
 
-# Render provides $PORT. Use it (fallback 8080 locally).
+# Render injects $PORT; default to 8080 locally
 ENV PORT=8080
 CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080}"]
