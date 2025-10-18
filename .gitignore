@@ -1,0 +1,39 @@
+# --- Python / VS Code
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+.envrc
+.venv/
+env/
+.vscode/
+*.log
+
+# --- Project outputs / temp
+*.tmp
+*.sqlite
+out*.json
+test_tmp.txt
+code.txt
+
+# --- Scraper session/state (keep out of git)
+storage_state.json
+linkedin_state.json
+companyv2.json
+outv3.json
+
+# --- OS junk
+.DS_Store
+Thumbs.db
+
+# --- Playwright (if you store artifacts locally)
+playwright-report/
+test-results/
+
+
+curl.exe -Method POST `
+  -Headers @{ "Content-Type"="application/json"; "x-api-key"="change-me" } `
+  -Body '{ "url":"https://www.linkedin.com/in/nallella-nihal-76bb42251/" }' `
+  http://localhost:8080/profile
