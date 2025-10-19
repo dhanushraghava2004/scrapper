@@ -17,21 +17,20 @@ def run_company_scrape(company_url: str, long_mode: bool = False) -> dict:
     data = {"company_url": company_url, "long_mode": long_mode, "ok": True}
     return data
 
-if __name__ == "__main__":
-    import sys, json
-    url = sys.argv[1]
-    long_mode = bool(int(sys.argv[2])) if len(sys.argv) > 2 else False
-    print(json.dumps(run_company_scrape(url, long_mode)))
 
 
 
+# was: 9000 / 3500
+NAV_TIMEOUT_MS = 30000         # 30s for page.goto & navigations
+ACTION_TIMEOUT_MS = 10000      # 10s for selectors/clicks
+SCROLL_WAIT_BETWEEN = 0.30
 
 
 # ------------------------- Faster defaults -------------------------
 
-NAV_TIMEOUT_MS = 9000        # navigation timeouts
-ACTION_TIMEOUT_MS = 3500     # locator waits, clicks, selectors
-SCROLL_WAIT_BETWEEN = 0.25   # seconds between scrolls
+# NAV_TIMEOUT_MS = 9000        # navigation timeouts
+# ACTION_TIMEOUT_MS = 3500     # locator waits, clicks, selectors
+# SCROLL_WAIT_BETWEEN = 0.25   # seconds between scrolls
 
 # ------------------------- Utils -------------------------
 
@@ -46,6 +45,24 @@ def clean_text(s: Optional[str]) -> Optional[str]:
             continue
         out_lines.append(ln)
     return "\n".join(out_lines).strip()
+
+async def goto_resilient(page: Page, url: str) -> None:
+    # try quick path first
+    try:
+        await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+        return
+    except Exception:
+        pass
+    # second try: longer & 'load'
+    try:
+        await page.goto(url, wait_until="load", timeout=30000)
+        return
+    except Exception:
+        pass
+    # last try: no wait_until, then explicitly wait for something we expect
+    await page.goto(url, timeout=30000)
+    with contextlib.suppress(Exception):
+        await page.wait_for_selector("main, body", timeout=10000)
 
 async def scroll_to_load(
     page: Page,
@@ -230,7 +247,7 @@ async def extract_company_about(page: Page, root: str) -> Dict[str, Any]:
     """
     about_url = root.rstrip("/") + "/about/"
     with contextlib.suppress(Exception):
-        await page.goto(about_url, wait_until="domcontentloaded")
+        await goto_resilient(page, about_url)
 
     # Expand "See more" with Playwright (Playwright CAN use :has-text)
     with contextlib.suppress(Exception):
@@ -337,7 +354,7 @@ async def extract_company_about(page: Page, root: str) -> Dict[str, Any]:
 async def extract_company_people(page: Page, root: str) -> Dict[str, Any]:
     people_url = root + "people/"
     with contextlib.suppress(Exception):
-        await page.goto(people_url, wait_until="domcontentloaded")
+        await goto_resilient(page, people_url)
         await page.wait_for_selector("main, section", timeout=ACTION_TIMEOUT_MS)
 
     text_blobs = await _gather_texts(page.locator("main, section"))
@@ -366,7 +383,7 @@ def _post_key(post: Dict[str, Any]) -> tuple:
 async def extract_company_posts(page: Page, root: str, max_posts: int = -1) -> List[Dict[str, Any]]:
     posts_url = root + "posts/"
     with contextlib.suppress(Exception):
-        await page.goto(posts_url, wait_until="domcontentloaded")
+        await goto_resilient(page, posts_url)
         await page.wait_for_selector(
             "div.occludable-update, div.feed-shared-update-v2, article.feed-shared-update, div.feed-shared-update",
             timeout=ACTION_TIMEOUT_MS
@@ -462,7 +479,7 @@ async def scrape_company(url: str, storage_state: str, *, headful: bool = False,
         #     await context.route("**/*", lambda route: route.abort() if route.request.resource_type in {"image","media","font"} else route.continue_())
 
         # Hit the root company page first
-        await page.goto(root, wait_until="domcontentloaded")
+        await goto_resilient(page, root)
         with contextlib.suppress(Exception):
             await page.wait_for_selector("main", timeout=3500)
         with contextlib.suppress(Exception):

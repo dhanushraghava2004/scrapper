@@ -14,3 +14,6 @@ COPY . .
 # Render injects $PORT; default to 8080 locally
 ENV PORT=8080
 CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080}"]
+
+
+
