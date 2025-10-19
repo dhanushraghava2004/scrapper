@@ -1798,12 +1798,23 @@ async def scrape_profile(url: str, storage_state: str, max_posts: int = -1, head
         browser = await p.chromium.launch(headless=not headful)
         context = await browser.new_context(storage_state=storage_state)
         context.set_default_timeout(ACTION_TIMEOUT_MS)
+        
+        if block_media:
+            async def _block_media(route):
+                r = route.request
+                if r.resource_type in {"image", "media", "font"}:
+                    await route.abort()
+                else:
+                    await route.continue_()
+            await context.route("**/*", _block_media)
+        
+        
         page = await context.new_page()
         page.set_default_timeout(ACTION_TIMEOUT_MS)
         page.set_default_navigation_timeout(NAV_TIMEOUT_MS)
 
-        if block_media:
-            await context.route("**/*", lambda route: route.abort() if route.request.resource_type in {"image","media","font"} else route.continue_())
+        # if block_media:
+        #     await context.route("**/*", lambda route: route.abort() if route.request.resource_type in {"image","media","font"} else route.continue_())
 
         await page.goto(url, wait_until="domcontentloaded")
         with contextlib.suppress(Exception):
